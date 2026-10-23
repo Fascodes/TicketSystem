@@ -50,8 +50,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable);
 
-        // here in the future add:
-        // .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+        // TODO: here in the future add: .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
 
         return http.build();
     }

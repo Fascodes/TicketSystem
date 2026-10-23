@@ -37,7 +37,7 @@ public class User {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    private Instant lastloginAt;
+    private Instant lastLoginAt;
 
     @ManyToMany(fetch=FetchType.EAGER)
     @JoinTable(
@@ -50,6 +50,8 @@ public class User {
     @PrePersist
     void onCreate(){
         this.createdAt = Instant.now();
+        this.lastLoginAt = Instant.now();
+        this.failedLoginAttempts = 0; // TODO: Reevaluate at laster stages of auth
     }
 
     public boolean isAccountNonLocked() {

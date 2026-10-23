@@ -35,7 +35,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        // uwzględnić czasowy lock, nie tylko flagę
+        // TODO: Add a time lock not just a simple bool flag
         return user.isAccountNonLocked()
                 && (user.getLockedUntil() == null || user.getLockedUntil().isBefore(Instant.now()));
     }
