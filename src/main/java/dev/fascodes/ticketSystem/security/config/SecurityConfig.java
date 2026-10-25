@@ -1,5 +1,7 @@
 package dev.fascodes.ticketSystem.security.config;
 
+import dev.fascodes.ticketSystem.auth.jwt.JwtService;
+import dev.fascodes.ticketSystem.security.filter.JwtAuthenticationFilter;
 import dev.fascodes.ticketSystem.security.filter.OriginCheckFilter;
 import dev.fascodes.ticketSystem.security.handler.JsonAccessDeniedHandler;
 import dev.fascodes.ticketSystem.security.handler.JsonAuthenticationEntryPoint;
@@ -8,6 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -38,10 +42,19 @@ public class SecurityConfig {
     }
 
     @Bean
+    static RoleHierarchy roleHierarchy() {
+        return RoleHierarchyImpl.withDefaultRolePrefix()
+                .role("ADMIN").implies("USER")
+                .build();
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
+            JwtService jwtService,
             @Value("${app.allowed-origins}") Set<String> allowedOrigins) throws Exception {
 
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
         OriginCheckFilter originCheckFilter = new OriginCheckFilter(allowedOrigins);
 
         http
@@ -50,9 +63,10 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -61,9 +75,10 @@ public class SecurityConfig {
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(originCheckFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // TODO: here in the future add: .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+        // TODO: Add a test module for just auth requests
 
         return http.build();
     }
