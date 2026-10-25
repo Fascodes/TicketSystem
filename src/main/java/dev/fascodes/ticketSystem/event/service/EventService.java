@@ -42,7 +42,7 @@ public class EventService {
         return eventMapper.toResponse(eventRepository.save(event));
     }
 
-    @PreAuthorize("@eventAccess.isOwner(#id, authentication) or hasRole('ADMIN') or @eventAccess.isPublic(#id)")
+    @PreAuthorize("hasRole('ADMIN') or @eventAccess.canView(#id, authentication)")
     @Transactional(readOnly = true)
     public EventResponse get(UUID id) {
         return eventMapper.toResponse(findEvent(id));

@@ -23,7 +23,14 @@ public class EventAccessPolicy {
         return eventRepository.existsByIdAndOwnerId(eventId, user.id());
     }
 
+    public boolean canView(UUID eventId, Authentication authentication) {
+        UUID userId = authentication != null
+                && authentication.getPrincipal() instanceof AuthenticatedUser user ? user.id() : null;
+        return eventRepository.canView(eventId, userId);
+    }
+
+
     public boolean isPublic(UUID eventId){
-        return eventRepository.existsByIdAndIsPublic(eventId);
+        return eventRepository.existsByIdAndIsPublished(eventId);
     }
 }
