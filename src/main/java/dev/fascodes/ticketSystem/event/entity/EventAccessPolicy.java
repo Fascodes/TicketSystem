@@ -31,6 +31,6 @@ public class EventAccessPolicy {
 
 
     public boolean isPublic(UUID eventId){
-        return eventRepository.existsByIdAndIsPublished(eventId);
+        return eventRepository.existsByIdAndPublishedTrue(eventId);
     }
 }

@@ -23,6 +23,7 @@ public class RefreshToken {
     @JoinColumn(name = "user_id", nullable = false)
     User user;
 
+    @Getter
     @Setter
     @Column(nullable = false, unique = true)
     String tokenHash;
@@ -36,6 +37,7 @@ public class RefreshToken {
     @Column(nullable = false)
     Boolean revoked = false;
 
+    @Getter
     @Setter
     UUID replacedByTokenId;
 

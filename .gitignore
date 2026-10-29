@@ -33,6 +33,7 @@ build/
 .vscode/
 
 keys
+src/test/resources/test-keys
 
 ### Secrets ###
 .env

@@ -3,6 +3,8 @@ package dev.fascodes.ticketSystem.security.config;
 import dev.fascodes.ticketSystem.auth.jwt.JwtService;
 import dev.fascodes.ticketSystem.security.filter.JwtAuthenticationFilter;
 import dev.fascodes.ticketSystem.security.filter.OriginCheckFilter;
+import dev.fascodes.ticketSystem.security.ratelimit.RateLimitFilter;
+import dev.fascodes.ticketSystem.security.ratelimit.RateLimitRule;
 import dev.fascodes.ticketSystem.security.handler.JsonAccessDeniedHandler;
 import dev.fascodes.ticketSystem.security.handler.JsonAuthenticationEntryPoint;
 
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,21 +27,27 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@EnableScheduling
 public class SecurityConfig {
     private final JsonAuthenticationEntryPoint authenticationEntryPoint;
     private final JsonAccessDeniedHandler accessDeniedHandler;
+    private final ObjectMapper objectMapper;
 
     public SecurityConfig(JsonAuthenticationEntryPoint authenticationEntryPoint,
-                          JsonAccessDeniedHandler accessDeniedHandler) {
+                          JsonAccessDeniedHandler accessDeniedHandler, ObjectMapper objectMapper) {
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -56,6 +65,11 @@ public class SecurityConfig {
 
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService);
         OriginCheckFilter originCheckFilter = new OriginCheckFilter(allowedOrigins);
+        RateLimitFilter rateLimitFilter = new RateLimitFilter(Map.of(
+                "/api/auth/login",    new RateLimitRule(10, Duration.ofMinutes(1)),
+                "/api/auth/register", new RateLimitRule(5,  Duration.ofHours(1)),
+                "/api/auth/refresh",  new RateLimitRule(30, Duration.ofMinutes(1))
+        ), objectMapper);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -76,7 +90,8 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(originCheckFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(originCheckFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, OriginCheckFilter.class);;
 
         // TODO: Add a test module for just auth requests
 

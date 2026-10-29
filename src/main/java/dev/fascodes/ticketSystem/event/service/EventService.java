@@ -2,6 +2,7 @@ package dev.fascodes.ticketSystem.event.service;
 
 import dev.fascodes.ticketSystem.event.dto.EventRequest;
 import dev.fascodes.ticketSystem.event.dto.EventResponse;
+import dev.fascodes.ticketSystem.event.dto.PublicEventResponse;
 import dev.fascodes.ticketSystem.event.entity.Event;
 import dev.fascodes.ticketSystem.event.exception.EventNotFoundException;
 import dev.fascodes.ticketSystem.event.mapper.EventMapper;
@@ -42,10 +43,18 @@ public class EventService {
         return eventMapper.toResponse(eventRepository.save(event));
     }
 
-    @PreAuthorize("hasRole('ADMIN') or @eventAccess.canView(#id, authentication)")
+    @PreAuthorize("@eventAccess.isOwner(#id, authentication) or hasRole('ADMIN')")
     @Transactional(readOnly = true)
     public EventResponse get(UUID id) {
         return eventMapper.toResponse(findEvent(id));
+    }
+
+    // Unpublished and missing events are indistinguishable (404) - existence is not leaked
+    @Transactional(readOnly = true)
+    public PublicEventResponse getPublished(UUID id) {
+        return eventRepository.findByIdAndPublishedTrue(id)
+                .map(eventMapper::toPublicResponse)
+                .orElseThrow(() -> new EventNotFoundException(id));
     }
 
     @PreAuthorize("@eventAccess.isOwner(#id, authentication) or hasRole('ADMIN')")

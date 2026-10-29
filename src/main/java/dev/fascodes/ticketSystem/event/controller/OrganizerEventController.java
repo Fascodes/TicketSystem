@@ -13,12 +13,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/events")
-public class EventController {
+@RequestMapping("/api/organizer/events")
+public class OrganizerEventController {
 
     private final EventService eventService;
 
-    public EventController(EventService eventService) {
+    public OrganizerEventController(EventService eventService) {
         this.eventService = eventService;
     }
 
