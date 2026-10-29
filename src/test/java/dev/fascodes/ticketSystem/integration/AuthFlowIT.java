@@ -2,11 +2,13 @@ package dev.fascodes.ticketSystem.integration;
 
 import jakarta.servlet.http.Cookie;
 import dev.fascodes.ticketSystem.auth.refresh.RefreshTokenRepository;
+import dev.fascodes.ticketSystem.common.MutableClock;
 import dev.fascodes.ticketSystem.config.PostgresTestConfig;
+import dev.fascodes.ticketSystem.config.TestClockConfig;
 import dev.fascodes.ticketSystem.user.entity.User;
 import dev.fascodes.ticketSystem.user.repository.RoleRepository;
 import dev.fascodes.ticketSystem.user.repository.UserRepository;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,7 +23,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.time.Instant;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -37,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(PostgresTestConfig.class)
+@Import({PostgresTestConfig.class, TestClockConfig.class})
 class AuthFlowIT {
 
     private static final String PASSWORD = "super-tajne-haslo-123";
@@ -55,6 +57,13 @@ class AuthFlowIT {
     RefreshTokenRepository refreshTokens;
     @Autowired
     PasswordEncoder encoder;
+    @Autowired
+    MutableClock clock;
+
+    @BeforeEach
+    void resetClock() {
+        clock.reset();
+    }
 
     record Session(String accessToken, Cookie refreshCookie) {}
 
@@ -247,19 +256,17 @@ class AuthFlowIT {
         }
         login(email, PASSWORD, randomIp()).andExpect(status().isUnauthorized());
 
-        User locked = users.findByEmail(email).orElseThrow();
-        assertThat(locked.getLockedUntil()).isAfter(Instant.now());
+        assertThat(users.findByEmail(email).orElseThrow().getLockedUntil())
+                .isEqualTo(clock.instant().plus(Duration.ofMinutes(15)));
 
-        locked.setLockedUntil(Instant.now().minusSeconds(60)); // symulacja upływu czasu
-        users.save(locked);
+        clock.advance(Duration.ofMinutes(14));
+        login(email, PASSWORD, randomIp()).andExpect(status().isUnauthorized());
 
+        clock.advance(Duration.ofMinutes(1).plusSeconds(1));
         login(email, PASSWORD, randomIp()).andExpect(status().isOk());
         assertThat(users.findByEmail(email).orElseThrow().getFailedLoginAttempts()).isZero();
     }
 
-    // TODO: When Clock is added rewrite to inject Clock fixed time
-    //  (bucket refreshes in a loop - slow BCrypt logins make the test unstable)
-    @Disabled("Rate limiting in a TODO for later")
     @Test
     void loginIsRateLimitedPerIp() throws Exception {
         String ip = randomIp();
@@ -268,6 +275,9 @@ class AuthFlowIT {
         }
         login("nikt@test.local", "cokolwiek123456", ip)
                 .andExpect(status().isTooManyRequests())
-                .andExpect(header().exists("Retry-After"));
+                .andExpect(header().string("Retry-After", "6")); // 10 tokenów / min -> jeden co 6 s
+
+        clock.advance(Duration.ofSeconds(6));
+        login("nikt@test.local", "cokolwiek123456", ip).andExpect(status().isUnauthorized());
     }
 }

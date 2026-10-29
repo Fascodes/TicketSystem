@@ -1,24 +1,30 @@
 package dev.fascodes.ticketSystem.security.ratelimit;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 
 final class TokenBucket {
 
     private final double capacity;
     private final double refillPerNano;
+    private final Clock clock;
     private double tokens;
-    private long lastNanos;
+    private Instant last;
 
-    TokenBucket(RateLimitRule rule) {
+    TokenBucket(RateLimitRule rule, Clock clock) {
         this.capacity = rule.capacity();
         this.refillPerNano = rule.capacity() / (double) rule.refillPeriod().toNanos();
         this.tokens = rule.capacity();
-        this.lastNanos = System.nanoTime();
+        this.clock = clock;
+        this.last = clock.instant();
     }
 
     synchronized long tryConsume() {
-        long now = System.nanoTime();
-        tokens = Math.min(capacity, tokens + (now - lastNanos) * refillPerNano);
-        lastNanos = now;
+        Instant now = clock.instant();
+        long elapsed = Math.max(0, Duration.between(last, now).toNanos());
+        tokens = Math.min(capacity, tokens + elapsed * refillPerNano);
+        last = now;
 
         if (tokens >= 1) {
             tokens -= 1;

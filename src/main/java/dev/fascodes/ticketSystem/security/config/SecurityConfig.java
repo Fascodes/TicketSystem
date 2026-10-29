@@ -33,6 +33,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             JwtService jwtService,
+            Clock clock,
             CorsConfigurationSource corsConfigurationSource,
             @Value("${app.allowed-origins}") Set<String> allowedOrigins) throws Exception {
 
@@ -74,7 +76,7 @@ public class SecurityConfig {
                 "/api/auth/login",    new RateLimitRule(10, Duration.ofMinutes(1)),
                 "/api/auth/register", new RateLimitRule(5,  Duration.ofHours(1)),
                 "/api/auth/refresh",  new RateLimitRule(30, Duration.ofMinutes(1))
-        ), objectMapper);
+        ), objectMapper, clock);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)

@@ -1,5 +1,6 @@
 package dev.fascodes.ticketSystem.security;
 
+import dev.fascodes.ticketSystem.common.MutableClock;
 import dev.fascodes.ticketSystem.security.ratelimit.RateLimitFilter;
 import dev.fascodes.ticketSystem.security.ratelimit.RateLimitRule;
 import org.junit.jupiter.api.Test;
@@ -15,8 +16,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RateLimitFilterTest {
 
+    private final MutableClock clock = new MutableClock();
     private final RateLimitFilter filter = new RateLimitFilter(
-            Map.of("/api/auth/login", new RateLimitRule(3, Duration.ofHours(1))), new ObjectMapper());
+            Map.of("/api/auth/login", new RateLimitRule(3, Duration.ofHours(1))), new ObjectMapper(), clock);
 
     private MockHttpServletResponse post(String path, String ip) throws Exception {
         var request = new MockHttpServletRequest("POST", path);
@@ -35,6 +37,19 @@ class RateLimitFilterTest {
         var blocked = post("/api/auth/login", "1.1.1.1");
         assertThat(blocked.getStatus()).isEqualTo(429);
         assertThat(Long.parseLong(blocked.getHeader("Retry-After"))).isPositive();
+    }
+
+    @Test
+    void bucketRefillsOverTime() throws Exception {
+        for (int i = 0; i < 3; i++) post("/api/auth/login", "1.1.1.1");
+        assertThat(post("/api/auth/login", "1.1.1.1").getHeader("Retry-After")).isEqualTo("1200");
+
+        clock.advance(Duration.ofMinutes(19));
+        assertThat(post("/api/auth/login", "1.1.1.1").getStatus()).isEqualTo(429);
+
+        clock.advance(Duration.ofMinutes(1)); // 3 tokeny / h -> jeden co 20 min
+        assertThat(post("/api/auth/login", "1.1.1.1").getStatus()).isEqualTo(200);
+        assertThat(post("/api/auth/login", "1.1.1.1").getStatus()).isEqualTo(429);
     }
 
     @Test

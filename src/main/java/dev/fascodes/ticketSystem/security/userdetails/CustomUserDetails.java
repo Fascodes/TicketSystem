@@ -6,16 +6,18 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class CustomUserDetails implements UserDetails {
     private final User user;
+    private final Clock clock;
 
-    public CustomUserDetails(User user) {
+    public CustomUserDetails(User user, Clock clock) {
         this.user = user;
+        this.clock = clock;
     }
 
     @Override
@@ -37,9 +39,8 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        // TODO: Add a time lock not just a simple bool flag
         return user.isAccountNonLocked()
-                && (user.getLockedUntil() == null || user.getLockedUntil().isBefore(Instant.now()));
+                && (user.getLockedUntil() == null || user.getLockedUntil().isBefore(clock.instant()));
     }
 
     @Override

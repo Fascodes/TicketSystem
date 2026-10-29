@@ -1,6 +1,7 @@
 package dev.fascodes.ticketSystem.jwt;
 
 import dev.fascodes.ticketSystem.auth.jwt.JwtService;
+import dev.fascodes.ticketSystem.common.MutableClock;
 import dev.fascodes.ticketSystem.common.TestKeys;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
@@ -45,10 +47,16 @@ class JwtServiceTest {
     }
 
     @Test
-    void expiredTokenIsRejected() {
-        JwtService expired = TestKeys.jwtService(Duration.ofMinutes(-2));
-        String t = expired.generateAccessToken(userId, "a@b.c", List.of());
-        assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(ExpiredJwtException.class);
+    void tokenIsValidWithinClockSkewAndRejectedAfter() {
+        MutableClock clock = new MutableClock();
+        JwtService service = TestKeys.jwtService(Duration.ofMinutes(10), clock);
+        String t = service.generateAccessToken(userId, "a@b.c", List.of());
+
+        clock.advance(Duration.ofMinutes(10).plusSeconds(29)); // exp + 29s mieści się w 30s skew
+        assertThat(service.parse(t).getSubject()).isEqualTo(userId.toString());
+
+        clock.advance(Duration.ofSeconds(2));
+        assertThatThrownBy(() -> service.parse(t)).isInstanceOf(ExpiredJwtException.class);
     }
 
     @Test
@@ -65,7 +73,7 @@ class JwtServiceTest {
     void tokenSignedWithForeignKeyIsRejected() {
         JwtService attacker = new JwtService((RSAPrivateKey) TestKeys.OTHER.getPrivate(),
                 (RSAPublicKey) TestKeys.OTHER.getPublic(),
-                TestKeys.props("https://test.local", Duration.ofMinutes(10)));
+                TestKeys.props("https://test.local", Duration.ofMinutes(10)), Clock.systemUTC());
         String t = attacker.generateAccessToken(userId, "a@b.c", List.of("ROLE_ADMIN"));
         assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(JwtException.class);
     }
@@ -74,7 +82,7 @@ class JwtServiceTest {
     void wrongIssuerIsRejected() {
         JwtService other = new JwtService((RSAPrivateKey) TestKeys.PAIR.getPrivate(),
                 (RSAPublicKey) TestKeys.PAIR.getPublic(),
-                TestKeys.props("https://evil.example", Duration.ofMinutes(10)));
+                TestKeys.props("https://evil.example", Duration.ofMinutes(10)), Clock.systemUTC());
         String t = other.generateAccessToken(userId, "a@b.c", List.of());
         assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(JwtException.class);
     }

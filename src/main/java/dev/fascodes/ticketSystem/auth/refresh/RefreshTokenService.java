@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Base64;
 import java.util.HexFormat;
 
@@ -24,10 +24,12 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository repository;
     private final JwtProperties props;
+    private final Clock clock;
 
-    public RefreshTokenService(RefreshTokenRepository repository, JwtProperties props) {
+    public RefreshTokenService(RefreshTokenRepository repository, JwtProperties props, Clock clock) {
         this.repository = repository;
         this.props = props;
+        this.clock = clock;
     }
 
     public record Rotation(User user, String newRawToken) {}
@@ -48,12 +50,12 @@ public class RefreshTokenService {
             revokeAllFor(current.getUser());
             throw new TokenReuseException();
         }
-        if (current.getExpiresAt().isBefore(Instant.now())) {
+        if (current.getExpiresAt().isBefore(clock.instant())) {
             throw new InvalidRefreshTokenException();
         }
 
         User user = current.getUser();
-        CustomUserDetails details = new CustomUserDetails(user);
+        CustomUserDetails details = new CustomUserDetails(user, clock);
         if (!details.isEnabled() || !details.isAccountNonLocked()) {
             throw new InvalidRefreshTokenException();
         }
@@ -80,7 +82,7 @@ public class RefreshTokenService {
         RefreshToken token = new RefreshToken();
         token.setUser(user);
         token.setTokenHash(hash(raw));
-        token.setExpiresAt(Instant.now().plus(props.refreshTtl()));
+        token.setExpiresAt(clock.instant().plus(props.refreshTtl()));
         token.setUserAgent(userAgent == null ? null : userAgent.substring(0, Math.min(userAgent.length(), 255)));
         token.setIpAddress(ip);
         return token;

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,15 +20,17 @@ public class LoginAttemptService {
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
 
     private final UserRepository userRepository;
+    private final Clock clock;
 
-    public LoginAttemptService(UserRepository userRepository) {
+    public LoginAttemptService(UserRepository userRepository, Clock clock) {
         this.userRepository = userRepository;
+        this.clock = clock;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(String email) {
         userRepository.findByEmailForUpdate(email).ifPresent(user -> {
-            Instant now = Instant.now();
+            Instant now = clock.instant();
             if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
                 return;
             }
@@ -47,7 +50,7 @@ public class LoginAttemptService {
         userRepository.findById(userId).ifPresent(user -> {
             user.setFailedLoginAttempts(0);
             user.setLockedUntil(null);
-            user.setLastLoginAt(Instant.now());
+            user.setLastLoginAt(clock.instant());
         });
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Date;
@@ -17,15 +18,17 @@ public class JwtService {
     private final RSAPrivateKey privateKey;
     private final RSAPublicKey publicKey;
     private final JwtProperties props;
+    private final Clock clock;
 
-    public JwtService(RSAPrivateKey privateKey, RSAPublicKey publicKey, JwtProperties props) {
+    public JwtService(RSAPrivateKey privateKey, RSAPublicKey publicKey, JwtProperties props, Clock clock) {
         this.privateKey = privateKey;
         this.publicKey = publicKey;
         this.props = props;
+        this.clock = clock;
     }
 
     public String generateAccessToken(UUID userId, String email, Collection<String> roles) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         return Jwts.builder()
                 .header().keyId(props.keyId()).and()
                 .issuer(props.issuer())
@@ -44,6 +47,7 @@ public class JwtService {
         return Jwts.parser()
                 .verifyWith(publicKey)
                 .requireIssuer(props.issuer())
+                .clock(() -> Date.from(clock.instant()))
                 .clockSkewSeconds(30)
                 .build()
                 .parseSignedClaims(token)

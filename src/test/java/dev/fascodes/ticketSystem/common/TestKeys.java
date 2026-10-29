@@ -8,6 +8,7 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
 import java.time.Duration;
 
 public final class TestKeys {
@@ -30,8 +31,12 @@ public final class TestKeys {
     }
 
     public static JwtService jwtService(Duration accessTtl) {
+        return jwtService(accessTtl, Clock.systemUTC());
+    }
+
+    public static JwtService jwtService(Duration accessTtl, Clock clock) {
         return new JwtService((RSAPrivateKey) PAIR.getPrivate(),
                 (RSAPublicKey) PAIR.getPublic(),
-                props("https://test.local", accessTtl));
+                props("https://test.local", accessTtl), clock);
     }
 }

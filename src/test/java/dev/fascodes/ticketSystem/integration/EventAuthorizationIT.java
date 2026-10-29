@@ -1,6 +1,8 @@
 package dev.fascodes.ticketSystem.integration;
 
+import dev.fascodes.ticketSystem.common.MutableClock;
 import dev.fascodes.ticketSystem.config.PostgresTestConfig;
+import dev.fascodes.ticketSystem.config.TestClockConfig;
 import dev.fascodes.ticketSystem.event.entity.Event;
 import dev.fascodes.ticketSystem.event.repository.EventRepository;
 import dev.fascodes.ticketSystem.security.filter.AuthenticatedUser;
@@ -33,7 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(PostgresTestConfig.class)
+@Import({PostgresTestConfig.class, TestClockConfig.class})
 class EventAuthorizationIT {
 
     @Autowired
@@ -44,6 +46,8 @@ class EventAuthorizationIT {
     EventRepository events;
     @Autowired
     VenueRepository venues;
+    @Autowired
+    MutableClock clock;
 
     private static RequestPostProcessor asUser(UUID id, String... roles) {
         var auth = UsernamePasswordAuthenticationToken.authenticated(
@@ -59,8 +63,8 @@ class EventAuthorizationIT {
         return users.save(u);
     }
 
-    // TODO: Consider switching from Instant to Clock - Bean in tests .fixed() in prod
     private Event persistEvent(User owner, boolean published) {
+        Instant now = clock.instant();
         Venue venue = new Venue();
         venue.setName("Test Venue");
         venues.save(venue);
@@ -68,9 +72,9 @@ class EventAuthorizationIT {
         e.setOwner(owner);
         e.setVenue(venue);
         e.setName("Test");
-        e.setStartDate(Instant.now().plusSeconds(3600));
-        e.setEndDate(Instant.now().plusSeconds(7200));
-        e.setTicketSaleDate(Instant.now());
+        e.setStartDate(now.plusSeconds(3600));
+        e.setEndDate(now.plusSeconds(7200));
+        e.setTicketSaleDate(now);
         e.setPublished(published);
         return events.save(e);
     }
