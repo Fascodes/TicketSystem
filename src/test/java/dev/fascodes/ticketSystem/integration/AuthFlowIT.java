@@ -136,6 +136,18 @@ class AuthFlowIT {
     }
 
     @Test
+    void apiResponsesCarrySecurityHeaders() throws Exception {
+        Session s = loginOk(registerUser());
+
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + s.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Strict-Transport-Security", "max-age=31536000 ; includeSubDomains"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+
+    @Test
     void protectedEndpointWithoutOrWithBrokenTokenReturnsJson401() throws Exception {
         mvc.perform(get("/api/me"))
                 .andExpect(status().isUnauthorized())

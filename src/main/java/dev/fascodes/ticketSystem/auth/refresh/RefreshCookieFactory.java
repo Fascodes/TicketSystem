@@ -13,7 +13,7 @@ public class RefreshCookieFactory {
     public ResponseCookie create(String rawToken, Duration ttl) {
         return ResponseCookie.from(NAME, rawToken)
                 .httpOnly(true)
-                .secure(true)            // TODO: Create a dev profile, can turn this off for easier testing
+                .secure(true)
                 .sameSite("Strict")
                 .path("/api/auth")
                 .maxAge(ttl)
