@@ -1,15 +1,14 @@
 package dev.fascodes.ticketSystem.auth.jwt;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.core.io.Resource;
 
+import java.nio.file.Path;
 import java.time.Duration;
 
 @ConfigurationProperties(prefix = "app.jwt")
 public record JwtProperties(
-        Resource privateKey,
-        Resource publicKey,
-        String keyId,
+        Path keysDir,
+        String activeKeyId,
         String issuer,
         Duration accessTtl,
         Duration refreshTtl) {}

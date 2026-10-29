@@ -1,11 +1,13 @@
 package dev.fascodes.ticketSystem.auth.jwt;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.LocatorAdapter;
+import io.jsonwebtoken.security.SignatureException;
 import org.springframework.stereotype.Service;
 
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
+import java.security.Key;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
@@ -15,14 +17,12 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
-    private final RSAPrivateKey privateKey;
-    private final RSAPublicKey publicKey;
+    private final JwtKeyRing keys;
     private final JwtProperties props;
     private final Clock clock;
 
-    public JwtService(RSAPrivateKey privateKey, RSAPublicKey publicKey, JwtProperties props, Clock clock) {
-        this.privateKey = privateKey;
-        this.publicKey = publicKey;
+    public JwtService(JwtKeyRing keys, JwtProperties props, Clock clock) {
+        this.keys = keys;
         this.props = props;
         this.clock = clock;
     }
@@ -30,7 +30,7 @@ public class JwtService {
     public String generateAccessToken(UUID userId, String email, Collection<String> roles) {
         Instant now = clock.instant();
         return Jwts.builder()
-                .header().keyId(props.keyId()).and()
+                .header().keyId(keys.activeKid()).and()
                 .issuer(props.issuer())
                 .subject(userId.toString())
                 .id(UUID.randomUUID().toString())
@@ -38,14 +38,14 @@ public class JwtService {
                 .expiration(Date.from(now.plus(props.accessTtl())))
                 .claim("email", email)
                 .claim("roles", roles)
-                .signWith(privateKey, Jwts.SIG.RS256)
+                .signWith(keys.signingKey(), Jwts.SIG.RS256)
                 .compact();
     }
 
-    /** Throws JwtException when issuer or exp are not equal*/
+    /** Throws JwtException when kid is unknown, signature is invalid, issuer differs or token expired */
     public Claims parse(String token) {
         return Jwts.parser()
-                .verifyWith(publicKey)
+                .keyLocator(new KidLocator())
                 .requireIssuer(props.issuer())
                 .clock(() -> Date.from(clock.instant()))
                 .clockSkewSeconds(30)
@@ -56,5 +56,13 @@ public class JwtService {
 
     public long accessTtlSeconds() {
         return props.accessTtl().toSeconds();
+    }
+
+    private class KidLocator extends LocatorAdapter<Key> {
+        @Override
+        protected Key locate(JwsHeader header) {
+            return keys.publicKey(header.getKeyId())
+                    .orElseThrow(() -> new SignatureException("Unknown or missing kid"));
+        }
     }
 }

@@ -1,8 +1,6 @@
 app:
   jwt:
-    private-key: classpath:test-keys/private.pem
-    public-key: classpath:test-keys/public.pem
-    key-id: test-key
+    active-key-id: test-key
     issuer: https://test.local
     access-ttl: 10m
     refresh-ttl: 14d

@@ -2,9 +2,12 @@ package dev.fascodes.ticketSystem.integration;
 
 import jakarta.servlet.http.Cookie;
 import dev.fascodes.ticketSystem.auth.refresh.RefreshTokenRepository;
+import dev.fascodes.ticketSystem.auth.jwt.JwtService;
 import dev.fascodes.ticketSystem.common.MutableClock;
+import dev.fascodes.ticketSystem.common.TestKeys;
 import dev.fascodes.ticketSystem.config.PostgresTestConfig;
 import dev.fascodes.ticketSystem.config.TestClockConfig;
+import dev.fascodes.ticketSystem.config.TestJwtKeysConfig;
 import dev.fascodes.ticketSystem.user.entity.User;
 import dev.fascodes.ticketSystem.user.repository.RoleRepository;
 import dev.fascodes.ticketSystem.user.repository.UserRepository;
@@ -24,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -39,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({PostgresTestConfig.class, TestClockConfig.class})
+@Import({PostgresTestConfig.class, TestClockConfig.class, TestJwtKeysConfig.class})
 class AuthFlowIT {
 
     private static final String PASSWORD = "super-tajne-haslo-123";
@@ -154,6 +158,38 @@ class AuthFlowIT {
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
                 .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+
+    @Test
+    void jwksExposesActiveAndRetiredPublicKeysOnly() throws Exception {
+        MvcResult res = mvc.perform(get("/.well-known/jwks.json"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("max-age=300")))
+                .andReturn();
+
+        var keys = json.readTree(res.getResponse().getContentAsString()).get("keys");
+        assertThat(keys).hasSize(2);
+        for (var k : keys) {
+            assertThat(k.get("kty").asText()).isEqualTo("RSA");
+            assertThat(k.get("alg").asText()).isEqualTo("RS256");
+            assertThat(k.has("d")).isFalse();
+        }
+        var active = java.util.stream.StreamSupport.stream(keys.spliterator(), false)
+                .filter(k -> k.get("kid").asText().equals(TestKeys.ACTIVE_KID)).findFirst().orElseThrow();
+        var modulus = new java.math.BigInteger(1, java.util.Base64.getUrlDecoder().decode(active.get("n").asText()));
+        assertThat(modulus).isEqualTo(((java.security.interfaces.RSAPublicKey) TestKeys.PAIR.getPublic()).getModulus());
+    }
+
+    @Test
+    void tokenSignedWithRetiredKeyStillAuthenticates() throws Exception {
+        User user = users.findByEmail(registerUser()).orElseThrow();
+        JwtService beforeRotation = new JwtService(
+                TestKeys.ring(TestKeys.RETIRED_KID, TestKeys.RETIRED, Map.of(TestKeys.RETIRED_KID, TestKeys.RETIRED)),
+                TestKeys.props("https://test.local", Duration.ofMinutes(10)), clock);
+        String oldToken = beforeRotation.generateAccessToken(user.getId(), user.getEmail(), List.of("ROLE_USER"));
+
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + oldToken))
+                .andExpect(status().isOk());
     }
 
     @Test

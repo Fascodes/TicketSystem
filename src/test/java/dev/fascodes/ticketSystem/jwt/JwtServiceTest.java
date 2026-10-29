@@ -10,12 +10,11 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
 
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -71,8 +70,9 @@ class JwtServiceTest {
 
     @Test
     void tokenSignedWithForeignKeyIsRejected() {
-        JwtService attacker = new JwtService((RSAPrivateKey) TestKeys.OTHER.getPrivate(),
-                (RSAPublicKey) TestKeys.OTHER.getPublic(),
+        // atakujący zna kid, ale nie ma naszego klucza prywatnego
+        JwtService attacker = new JwtService(
+                TestKeys.ring(TestKeys.ACTIVE_KID, TestKeys.OTHER, Map.of(TestKeys.ACTIVE_KID, TestKeys.OTHER)),
                 TestKeys.props("https://test.local", Duration.ofMinutes(10)), Clock.systemUTC());
         String t = attacker.generateAccessToken(userId, "a@b.c", List.of("ROLE_ADMIN"));
         assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(JwtException.class);
@@ -80,11 +80,59 @@ class JwtServiceTest {
 
     @Test
     void wrongIssuerIsRejected() {
-        JwtService other = new JwtService((RSAPrivateKey) TestKeys.PAIR.getPrivate(),
-                (RSAPublicKey) TestKeys.PAIR.getPublic(),
+        JwtService other = new JwtService(TestKeys.ring(),
                 TestKeys.props("https://evil.example", Duration.ofMinutes(10)), Clock.systemUTC());
         String t = other.generateAccessToken(userId, "a@b.c", List.of());
         assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(JwtException.class);
+    }
+
+    // ---------- Rotation after kid ----------
+
+    private static JwtService signingWith(String kid, java.security.KeyPair pair, Map<String, java.security.KeyPair> verification) {
+        return new JwtService(TestKeys.ring(kid, pair, verification),
+                TestKeys.props("https://test.local", Duration.ofMinutes(10)), Clock.systemUTC());
+    }
+
+    @Test
+    void tokenSignedWithRetiredKeyIsStillAcceptedAfterRotation() {
+        JwtService before = signingWith(TestKeys.RETIRED_KID, TestKeys.RETIRED,
+                Map.of(TestKeys.RETIRED_KID, TestKeys.RETIRED));
+        String oldToken = before.generateAccessToken(userId, "a@b.c", List.of());
+
+        assertThat(jwt.parse(oldToken).getSubject()).isEqualTo(userId.toString());
+        String newHeader = new String(Base64.getUrlDecoder().decode(token().split("\\.")[0]), UTF_8);
+        assertThat(newHeader).contains("\"kid\":\"" + TestKeys.ACTIVE_KID + "\"");
+    }
+
+    @Test
+    void tokenSignedWithRemovedKeyIsRejected() {
+        String oldToken = jwt.generateAccessToken(userId, "a@b.c", List.of()); 
+
+        JwtService afterCleanup = signingWith(TestKeys.RETIRED_KID, TestKeys.RETIRED,
+                Map.of(TestKeys.RETIRED_KID, TestKeys.RETIRED));
+        assertThatThrownBy(() -> afterCleanup.parse(oldToken)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    void kidPointingToDifferentKeyIsRejected() {
+        JwtService liar = signingWith(TestKeys.ACTIVE_KID, TestKeys.RETIRED,
+                Map.of(TestKeys.ACTIVE_KID, TestKeys.RETIRED));
+        String t = liar.generateAccessToken(userId, "a@b.c", List.of());
+        assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    void tokenWithoutKidIsRejected() {
+        String t = Jwts.builder().issuer("https://test.local").subject(userId.toString())
+                .signWith(TestKeys.PAIR.getPrivate(), Jwts.SIG.RS256).compact();
+        assertThatThrownBy(() -> jwt.parse(t)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    void keyRingRejectsMismatchedActivePair() {
+        assertThatThrownBy(() -> TestKeys.ring(TestKeys.ACTIVE_KID, TestKeys.PAIR,
+                Map.of(TestKeys.ACTIVE_KID, TestKeys.OTHER)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

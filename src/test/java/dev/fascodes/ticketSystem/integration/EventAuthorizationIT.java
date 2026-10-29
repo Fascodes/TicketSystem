@@ -3,6 +3,7 @@ package dev.fascodes.ticketSystem.integration;
 import dev.fascodes.ticketSystem.common.MutableClock;
 import dev.fascodes.ticketSystem.config.PostgresTestConfig;
 import dev.fascodes.ticketSystem.config.TestClockConfig;
+import dev.fascodes.ticketSystem.config.TestJwtKeysConfig;
 import dev.fascodes.ticketSystem.event.entity.Event;
 import dev.fascodes.ticketSystem.event.repository.EventRepository;
 import dev.fascodes.ticketSystem.security.filter.AuthenticatedUser;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({PostgresTestConfig.class, TestClockConfig.class})
+@Import({PostgresTestConfig.class, TestClockConfig.class, TestJwtKeysConfig.class})
 class EventAuthorizationIT {
 
     @Autowired
