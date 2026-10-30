@@ -53,7 +53,11 @@ public class AuthService {
         User user = new User();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(req.password()));
-        user.setEnabled(true); // TODO: Later add email verification not default account enable/email verification
+        // TODO: Later add email verification not default account enable/email verification
+        //  - enabled=false until email verification (OneTimeToken - needs a new table/migration)
+        //  - reset and password change (after: revokeAllByUserId on refresh tokens)
+        //  - account lock notification
+        user.setEnabled(true);
         user.getRoles().add(roleRepository.findByName("ROLE_USER").orElseThrow());
         userRepository.save(user);
     }
