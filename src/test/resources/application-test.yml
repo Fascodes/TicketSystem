@@ -1,0 +1,12 @@
+app:
+  jwt:
+    active-key-id: test-key
+    issuer: https://test.local
+    access-ttl: 10m
+    refresh-ttl: 14d
+  # @Value nie czyta list YAML (klucze [0], [1]) - wartość jako string rozdzielany przecinkami
+  allowed-origins: http://localhost:3000
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate   # schemat tworzy wyłącznie Flyway, więc test sprawdza też zgodność encji z migracjami

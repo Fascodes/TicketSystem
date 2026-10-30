@@ -1,0 +1,59 @@
+package dev.fascodes.ticketSystem.security.userdetails;
+
+import dev.fascodes.ticketSystem.user.entity.User;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.Clock;
+import java.util.Collection;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+public class CustomUserDetails implements UserDetails {
+    private final User user;
+    private final Clock clock;
+
+    public CustomUserDetails(User user, Clock clock) {
+        this.user = user;
+        this.clock = clock;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return user.getRoles().stream()
+            .map(role -> new SimpleGrantedAuthority(role.getName()))
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public String getPassword() {
+        return user.getPasswordHash();
+    }
+
+    @Override
+    public String getUsername() {
+        return user.getEmail();
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return user.isAccountNonLocked()
+                && (user.getLockedUntil() == null || user.getLockedUntil().isBefore(clock.instant()));
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return user.isEnabled();
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    public UUID getId() {
+        return user.getId();
+    }
+}

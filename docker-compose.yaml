@@ -1,0 +1,22 @@
+# Values come from .env (loaded automatically by docker compose). Template: .env.example
+services:
+  db:
+    image: postgres:16
+    container_name: ${DB_CONTAINER_NAME:-ticket-system-db}
+    ports:
+      - "${DB_PORT}:5432"
+    environment:
+      # [SECRET]
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - ticket-network
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+networks:
+  ticket-network:
+
+volumes:
+  db_data:
