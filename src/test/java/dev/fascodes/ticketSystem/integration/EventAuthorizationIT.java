@@ -5,6 +5,7 @@ import dev.fascodes.ticketSystem.config.PostgresTestConfig;
 import dev.fascodes.ticketSystem.config.TestClockConfig;
 import dev.fascodes.ticketSystem.config.TestJwtKeysConfig;
 import dev.fascodes.ticketSystem.event.entity.Event;
+import dev.fascodes.ticketSystem.event.entity.EventCategory;
 import dev.fascodes.ticketSystem.event.repository.EventRepository;
 import dev.fascodes.ticketSystem.security.filter.AuthenticatedUser;
 import dev.fascodes.ticketSystem.user.entity.User;
@@ -73,6 +74,7 @@ class EventAuthorizationIT {
         e.setOwner(owner);
         e.setVenue(venue);
         e.setName("Test");
+        e.setCategory(EventCategory.OTHER);
         e.setStartDate(now.plusSeconds(3600));
         e.setEndDate(now.plusSeconds(7200));
         e.setTicketSaleDate(now);

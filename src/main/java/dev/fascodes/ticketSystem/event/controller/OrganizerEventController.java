@@ -1,12 +1,16 @@
 package dev.fascodes.ticketSystem.event.controller;
 
+import dev.fascodes.ticketSystem.common.PageResponse;
+import dev.fascodes.ticketSystem.event.dto.EventFilter;
 import dev.fascodes.ticketSystem.event.dto.EventRequest;
 import dev.fascodes.ticketSystem.event.dto.EventResponse;
 import dev.fascodes.ticketSystem.event.service.EventService;
 import dev.fascodes.ticketSystem.security.filter.AuthenticatedUser;
 
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +31,15 @@ public class OrganizerEventController {
     public EventResponse create(@Valid @RequestBody EventRequest req,
                                 @AuthenticationPrincipal AuthenticatedUser user) {
         return eventService.create(req, user.id());
+    }
+
+    // Same filters as the public list, plus published (drafts are visible here)
+    @GetMapping
+    public PageResponse<EventResponse> search(@Valid EventFilter filter,
+                                              @RequestParam(required = false) Boolean published,
+                                              Pageable pageable,
+                                              Authentication authentication) {
+        return eventService.searchManaged(filter, published, pageable, authentication);
     }
 
     @GetMapping("/{id}")

@@ -17,6 +17,7 @@ public class EventMapper {
                 event.getOwner().getId(),
                 event.getVenue().getId(),
                 event.getName(),
+                event.getCategory(),
                 event.getStartDate(),
                 event.getEndDate(),
                 event.getTicketSaleDate(),
@@ -28,6 +29,7 @@ public class EventMapper {
                 event.getId(),
                 event.getVenue().getId(),
                 event.getName(),
+                event.getCategory(),
                 event.getStartDate(),
                 event.getEndDate(),
                 event.getTicketSaleDate());
@@ -35,6 +37,7 @@ public class EventMapper {
 
     public void apply(EventRequest req, Event event) {
         event.setName(req.name().trim());
+        event.setCategory(req.category());
         event.setStartDate(req.startDate());
         event.setEndDate(req.endDate());
         event.setTicketSaleDate(req.ticketSaleDate());

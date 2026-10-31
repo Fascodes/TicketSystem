@@ -17,6 +17,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -66,6 +67,18 @@ public class GlobalExceptionHandler {
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(ApiError.of(HttpStatus.BAD_REQUEST, message, req));
+    }
+
+    @ExceptionHandler(InvalidSortException.class)
+    public ResponseEntity<ApiError> invalidSort(InvalidSortException ex, HttpServletRequest req) {
+        return ResponseEntity.badRequest().body(ApiError.of(HttpStatus.BAD_REQUEST, ex.getMessage(), req));
+    }
+
+    // Malformed path/query param (e.g. non-UUID id, published=abc) - client error, not 500
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> typeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+        return ResponseEntity.badRequest()
+                .body(ApiError.of(HttpStatus.BAD_REQUEST, ex.getName() + ": invalid value", req));
     }
 
     @ExceptionHandler(Exception.class)
