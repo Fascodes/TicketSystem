@@ -4,11 +4,16 @@ import dev.fascodes.ticketSystem.auth.exception.EmailAlreadyUsedException;
 import dev.fascodes.ticketSystem.auth.exception.InvalidRefreshTokenException;
 import dev.fascodes.ticketSystem.auth.exception.TokenReuseException;
 import dev.fascodes.ticketSystem.auth.refresh.RefreshCookieFactory;
+import dev.fascodes.ticketSystem.event.exception.CapacityBelowSoldException;
 import dev.fascodes.ticketSystem.event.exception.EventNotFoundException;
+import dev.fascodes.ticketSystem.reservation.exception.ReservationConflictException;
+import dev.fascodes.ticketSystem.reservation.exception.ReservationNotFoundException;
 import dev.fascodes.ticketSystem.venue.exception.VenueNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -55,7 +60,27 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(HttpStatus.CONFLICT, "Email already in use", req));
     }
 
-    @ExceptionHandler({EventNotFoundException.class, VenueNotFoundException.class})
+    @ExceptionHandler({ReservationConflictException.class, CapacityBelowSoldException.class})
+    public ResponseEntity<ApiError> businessConflict(RuntimeException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(HttpStatus.CONFLICT, ex.getMessage(), req));
+    }
+
+    // Lock wait timed out - another transaction holds the event row (e.g. a burst of payments)
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> lockTimeout(HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(HttpStatus.CONFLICT, "Resource is busy, please retry", req));
+    }
+
+    // Constraint hit that the service did not translate itself (e.g. deleting an event that has reservations)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> integrityViolation(HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(HttpStatus.CONFLICT, "Operation conflicts with existing data", req));
+    }
+
+    @ExceptionHandler({EventNotFoundException.class, VenueNotFoundException.class, ReservationNotFoundException.class})
     public ResponseEntity<ApiError> notFound(HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiError.of(HttpStatus.NOT_FOUND, "Resource not found", req));

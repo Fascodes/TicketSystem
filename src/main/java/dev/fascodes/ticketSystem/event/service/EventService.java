@@ -6,6 +6,7 @@ import dev.fascodes.ticketSystem.event.dto.EventRequest;
 import dev.fascodes.ticketSystem.event.dto.EventResponse;
 import dev.fascodes.ticketSystem.event.dto.PublicEventResponse;
 import dev.fascodes.ticketSystem.event.entity.Event;
+import dev.fascodes.ticketSystem.event.exception.CapacityBelowSoldException;
 import dev.fascodes.ticketSystem.event.exception.EventNotFoundException;
 import dev.fascodes.ticketSystem.event.mapper.EventMapper;
 import dev.fascodes.ticketSystem.event.repository.EventRepository;
@@ -50,6 +51,8 @@ public class EventService {
         event.setOwner(userRepository.getReferenceById(ownerId));
         event.setVenue(findVenue(req.venueId()));
         eventMapper.apply(req, event);
+        event.setCapacity(req.capacity());
+        event.setAvailableSeats(req.capacity());
         return eventMapper.toResponse(eventRepository.save(event));
     }
 
@@ -94,11 +97,13 @@ public class EventService {
     @PreAuthorize("@eventAccess.isOwner(#id, authentication) or hasRole('ADMIN')")
     @Transactional
     public EventResponse update(UUID id, EventRequest req) {
-        Event event = findEvent(id);
+        // Locked like a payment - otherwise a concurrent sale could slip between reading and resizing the pool
+        Event event = eventRepository.findByIdForUpdate(id).orElseThrow(() -> new EventNotFoundException(id));
         if (!event.getVenue().getId().equals(req.venueId())) {
             event.setVenue(findVenue(req.venueId()));
         }
         eventMapper.apply(req, event);
+        resizePool(event, req.capacity());
         return eventMapper.toResponse(event);
     }
 
@@ -114,6 +119,16 @@ public class EventService {
 
     private Venue findVenue(UUID id) {
         return venueRepository.findById(id).orElseThrow(() -> new VenueNotFoundException(id));
+    }
+
+    // Sold seats stay sold - only the free part of the pool follows the capacity change
+    private static void resizePool(Event event, int newCapacity) {
+        int sold = event.getCapacity() - event.getAvailableSeats();
+        if (newCapacity < sold) {
+            throw new CapacityBelowSoldException(newCapacity, sold);
+        }
+        event.setCapacity(newCapacity);
+        event.setAvailableSeats(newCapacity - sold);
     }
 
     private static Specification<Event> filterSpec(EventFilter filter) {

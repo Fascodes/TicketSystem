@@ -50,6 +50,13 @@ public class Event {
     @Column(nullable = false)
     private Boolean published = false;
 
+    @Column(nullable = false)
+    private int capacity;
+
+    // Decremented only when a reservation is paid - always under a pessimistic lock (findByIdForUpdate)
+    @Column(nullable = false)
+    private int availableSeats;
+
     public boolean isPublished() {
         return this.published;
     }

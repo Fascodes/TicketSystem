@@ -13,4 +13,6 @@ public record PublicEventResponse(
         EventCategory category,
         Instant startDate,
         Instant endDate,
-        Instant ticketSaleDate) {}
+        Instant ticketSaleDate,
+        int capacity,
+        int availableSeats) {}

@@ -21,6 +21,8 @@ public class EventMapper {
                 event.getStartDate(),
                 event.getEndDate(),
                 event.getTicketSaleDate(),
+                event.getCapacity(),
+                event.getAvailableSeats(),
                 event.isPublished());
     }
 
@@ -32,7 +34,9 @@ public class EventMapper {
                 event.getCategory(),
                 event.getStartDate(),
                 event.getEndDate(),
-                event.getTicketSaleDate());
+                event.getTicketSaleDate(),
+                event.getCapacity(),
+                event.getAvailableSeats());
     }
 
     public void apply(EventRequest req, Event event) {

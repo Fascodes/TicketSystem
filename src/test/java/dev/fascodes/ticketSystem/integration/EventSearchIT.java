@@ -236,7 +236,7 @@ class EventSearchIT {
         Venue venue = persistVenue();
         Instant start = clock.instant().plusSeconds(3600);
         String body = """
-                {"name":"Gig","venueId":"%s","startDate":"%s","endDate":"%s","ticketSaleDate":"%s","published":true}
+                {"name":"Gig","venueId":"%s","startDate":"%s","endDate":"%s","ticketSaleDate":"%s","capacity":100,"published":true}
                 """.formatted(venue.getId(), start, start.plusSeconds(3600), clock.instant());
 
         mvc.perform(post("/api/organizer/events").with(asUser(owner.getId(), "ROLE_USER"))

@@ -14,4 +14,6 @@ public record EventResponse(
         Instant startDate,
         Instant endDate,
         Instant ticketSaleDate,
+        int capacity,
+        int availableSeats,
         boolean published) {}
